@@ -3,7 +3,7 @@
 set -xe
 
 BIN=payeq
-SRC=main.c
+SRC=payeq.c
 CFLAGS="-Wall -Wextra -Werror -pedantic"
 # DEBUG_FLAGS="-ggdb"
 
