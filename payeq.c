@@ -306,7 +306,7 @@ int main(void) {
         case 3:
             for (size_t i = 0; i < payeq->payment_records->size; i++) {
                 struct payment_record *pr = payeq->payment_records->list[i];
-                printf("\n[*] %s10 pays $%.2f to %s\n", pr->from->name, pr->quantity,
+                printf("\n[*] %s pays $%.2f to %s\n", pr->from->name, pr->quantity,
                        pr->to->name);
             }
             break;
