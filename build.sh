@@ -4,7 +4,11 @@ set -xe
 
 BIN=payeq
 SRC=payeq.c
-CFLAGS="-Wall -Wextra -Werror -pedantic"
-# DEBUG_FLAGS="-ggdb"
+CFLAGS="-Wall -Wextra -pedantic"
+DEBUG_FLAGS="-ggdb -fsanitize=address,undefined -fanalyzer"
 
-clang -o $BIN $SRC $CFLAGS
+if [ "$1" == "--debug" ]; then
+    gcc -o $BIN $SRC $CFLAGS $DEBUG_FLAGS
+else
+    gcc -o $BIN $SRC $CFLAGS
+fi
