@@ -12,7 +12,7 @@ Payeq is a simple command-line program written in C that facilitates fair expens
 
 ### Prerequisites
 
-- Ensure you have a C compiler installed on your system (the script uses clang).
+- Ensure you have a C compiler installed on your system (the script uses gcc).
 
 ### Compilation
 
