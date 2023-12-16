@@ -46,6 +46,7 @@ struct person_vec {
 
 struct person_vec *persons_vec_alloc(void) {
     struct person_vec *p_vec = malloc(sizeof(*p_vec));
+    check_ptr(p_vec);
     p_vec->list = malloc(sizeof(struct person *) * VECTOR_INITAL_CAP);
     check_ptr(p_vec->list);
     p_vec->capacity = VECTOR_INITAL_CAP;
@@ -62,16 +63,19 @@ void persons_vec_free(struct person_vec *p_vec) {
     free(p_vec);
 }
 
-void person_vec_push(struct person_vec *p_vec, struct person *p) {
+int person_vec_push(struct person_vec *p_vec, struct person *p) {
     if (!p_vec || !p) {
-        return;
+        return 1;
     }
     if (p_vec->capacity <= p_vec->size + 1) {
         p_vec->capacity = p_vec->capacity == 0 ? 1 : p_vec->capacity * 2;
-        p_vec->list     = realloc(p_vec->list, p_vec->capacity);
-        check_ptr(p_vec->list);
+        struct person **new_list =
+            realloc(p_vec->list, sizeof(struct person *) * p_vec->capacity);
+        check_ptr(new_list);
+        p_vec->list = new_list;
     }
     p_vec->list[p_vec->size++] = p;
+    return 0;
 }
 
 struct payment_record {
@@ -120,17 +124,20 @@ void payment_record_vec_free(struct payment_record_vec *pr_vec) {
     free(pr_vec);
 }
 
-void payment_record_vec_push(struct payment_record_vec *pr_vec,
-                             struct payment_record *pr) {
+int payment_record_vec_push(struct payment_record_vec *pr_vec,
+                            struct payment_record *pr) {
     if (!pr_vec || !pr) {
-        return;
+        return 1;
     }
     if (pr_vec->capacity <= pr_vec->size + 1) {
         pr_vec->capacity = pr_vec->capacity == 0 ? 1 : pr_vec->capacity * 2;
-        pr_vec->list     = realloc(pr_vec->list, pr_vec->capacity);
-        check_ptr(pr_vec->list);
+        struct payment_record **new_list = realloc(
+            pr_vec->list, sizeof(struct payment_record *) * pr_vec->capacity);
+        check_ptr(new_list);
+        pr_vec->list = new_list;
     }
     pr_vec->list[pr_vec->size++] = pr;
+    return 0;
 }
 
 struct payeq {
@@ -142,10 +149,12 @@ struct payeq {
 struct payeq *payeq_alloc(void) {
     struct payeq *pq = malloc(sizeof(*pq));
     check_ptr(pq);
-    pq->persons         = persons_vec_alloc();
+    pq->persons = persons_vec_alloc();
+    check_ptr(pq->persons);
     pq->payment_records = payment_record_vec_alloc();
-    pq->total_debts     = 0.0;
-    pq->avg_payment     = 0.0;
+    check_ptr(pq->payment_records);
+    pq->total_debts = 0.0;
+    pq->avg_payment = 0.0;
     return pq;
 }
 
@@ -181,7 +190,7 @@ void payeq_calc_debts_and_credits(struct payeq *payeq) {
     }
 }
 
-void payeq_bring_equity(struct payeq *payeq) {
+int payeq_bring_equity(struct payeq *payeq) {
     float td;          // Copy of total debts
     float tm;          // Transfered money
     struct person *gd; // Greatest debtor
@@ -206,6 +215,10 @@ void payeq_bring_equity(struct payeq *payeq) {
             }
         }
 
+        if (!gc || !gd) {
+            return 1;
+        }
+
         // Find how much money transfer to creditor
         tm = 0;
         tm = gc->credit - gd->debt >= 0
@@ -216,23 +229,27 @@ void payeq_bring_equity(struct payeq *payeq) {
         // Save the payment
         struct payment_record *new_pr = payment_record_generate(gd, gc, tm);
         check_ptr(new_pr);
-        payment_record_vec_push(payeq->payment_records, new_pr);
+        if (payment_record_vec_push(payeq->payment_records, new_pr) != 0) {
+            free(new_pr);
+        }
 
         // Update for next iteration
         gd->debt -= tm;
         gc->credit -= tm;
         td -= tm;
     }
+    return 0;
 }
 
-void payeq_add_person(struct payeq *payeq, struct person *person) {
-    person_vec_push(payeq->persons, person);
+int payeq_add_person(struct payeq *payeq, struct person *person) {
+    return person_vec_push(payeq->persons, person);
 }
 
-void payeq_process(struct payeq *payeq) {
+int payeq_process(struct payeq *payeq) {
     payeq_calc_avg_payment(payeq);
     payeq_calc_debts_and_credits(payeq);
-    payeq_bring_equity(payeq);
+    int ret = payeq_bring_equity(payeq);
+    return ret;
 }
 
 void print_menu(void) {
@@ -295,19 +312,26 @@ int main(void) {
 
             struct person *new_person = person_generate(name, paid);
             check_ptr(new_person);
-            payeq_add_person(payeq, new_person);
-            printf("\n[*] %s added successfully.\n", name);
+            if (payeq_add_person(payeq, new_person) == 0) {
+                printf("\n[*] %s added successfully.\n", name);
+            } else {
+                printf("\n[!] Could not add person.\n");
+            }
             break;
         }
         case 2:
-            payeq_process(payeq);
-            printf("\n[*] Expense sharing processed successfully.\n");
+            if (payeq_process(payeq) == 0) {
+                printf("\n[*] Expense sharing processed successfully.\n");
+            } else {
+                fprintf(stderr,
+                        "\n[!] Could not compute the expense sharing.\n");
+            }
             break;
         case 3:
             for (size_t i = 0; i < payeq->payment_records->size; i++) {
                 struct payment_record *pr = payeq->payment_records->list[i];
-                printf("\n[*] %s pays $%.2f to %s\n", pr->from->name, pr->quantity,
-                       pr->to->name);
+                printf("\n[*] %s pays $%.2f to %s\n", pr->from->name,
+                       pr->quantity, pr->to->name);
             }
             break;
         case 4:
